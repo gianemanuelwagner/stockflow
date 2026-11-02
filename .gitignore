@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.firebase/
+*debug.log*
+*service-account*.json
+*serviceAccount*.json
+*.pem
+*.key
+*.local
+.npm-cache/

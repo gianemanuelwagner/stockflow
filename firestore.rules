@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signed() { return request.auth != null; }
+  function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+  function active() { return signed() && profile().status == 'active'; }
+  function admin() { return active() && profile().role == 'admin'; }
+  function own(data) { return active() && data.ownerId == request.auth.uid; }
+  function text(v, max) { return v is string && v.size() <= max; }
+  function positive(v) { return v is number && v >= 0 && v <= 1000000000; }
+  match /users/{uid} {
+   allow read: if signed() && (request.auth.uid == uid || admin());
+   allow create: if signed() && request.auth.uid == uid
+     && request.resource.data.keys().hasAll(['name','business','email','role','status','createdAt'])
+     && request.resource.data.keys().hasOnly(['name','business','email','role','status','createdAt'])
+     && request.resource.data.role == 'user' && request.resource.data.status == 'active'
+     && request.resource.data.email == request.auth.token.email
+     && text(request.resource.data.name,120) && request.resource.data.name.size()>0
+     && text(request.resource.data.business,120) && request.resource.data.business.size()>0
+     && request.resource.data.createdAt == request.time;
+   allow update: if (active() && request.auth.uid == uid
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','business'])
+      && text(request.resource.data.name,120) && request.resource.data.name.size()>0
+      && text(request.resource.data.business,120) && request.resource.data.business.size()>0)
+     || (admin() && request.auth.uid != uid
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+      && request.resource.data.status in ['active','suspended']);
+   allow delete: if false;
+  }
+  match /products/{id} {
+   function valid() {
+    let d = request.resource.data;
+    return d.keys().hasAll(['ownerId','name','sku','category','description','cost','price','quantity','minimum','archived','createdAt'])
+     && d.keys().hasOnly(['ownerId','name','sku','category','description','cost','price','quantity','minimum','archived','createdAt'])
+     && text(d.name,160) && d.name.size()>0 && text(d.sku,80) && d.sku.size()>0
+     && text(d.category,100) && text(d.description,1000)
+     && positive(d.cost) && positive(d.price) && positive(d.quantity) && positive(d.minimum)
+     && d.archived is bool && d.createdAt is timestamp;
+   }
+   allow read: if own(resource.data) || admin();
+   allow create: if own(request.resource.data) && valid() && request.resource.data.createdAt == request.time;
+   allow update: if own(resource.data) && request.resource.data.ownerId == resource.data.ownerId
+     && request.resource.data.createdAt == resource.data.createdAt && valid();
+   allow delete: if false;
+  }
+  match /categories/{id} {
+   function valid() {return request.resource.data.keys().hasAll(['ownerId','name']) && request.resource.data.keys().hasOnly(['ownerId','name']) && text(request.resource.data.name,100) && request.resource.data.name.size()>0;}
+   allow read: if own(resource.data) || admin();
+   allow create: if own(request.resource.data) && valid();
+   allow update: if own(resource.data) && request.resource.data.ownerId == resource.data.ownerId && valid();
+   allow delete: if own(resource.data);
+  }
+  match /movements/{id} {
+   allow read: if own(resource.data) || admin();
+   allow create: if own(request.resource.data)
+    && request.resource.data.keys().hasAll(['ownerId','productId','productName','type','amount','before','after','reason','date','createdAt'])
+    && request.resource.data.keys().hasOnly(['ownerId','productId','productName','type','amount','before','after','reason','date','createdAt'])
+    && text(request.resource.data.productId,128) && text(request.resource.data.productName,160)
+    && request.resource.data.type in ['inicial','entrada','salida','ajuste']
+    && positive(request.resource.data.amount) && positive(request.resource.data.before) && positive(request.resource.data.after)
+    && text(request.resource.data.reason,500) && request.resource.data.reason.size()>0
+    && text(request.resource.data.date,40) && request.resource.data.createdAt == request.time;
+   allow update, delete: if false;
+  }
+ }
+}
