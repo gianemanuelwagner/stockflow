@@ -122,3 +122,17 @@ MIT. Podés usar, modificar y distribuir esta aplicación bajo los términos de 
 ## Verificación y dependencias
 
 Se aplicó una actualización de Firebase CLI y se fijó una versión compatible corregida de `@grpc/grpc-js` mediante `overrides`. La auditoría de dependencias de producción no reporta vulnerabilidades. La CLI de Firebase conserva avisos moderados en dependencias de desarrollo; no se incluyen en el sitio publicado. No se aplicó `npm audit fix --force` porque propone retroceder versiones mayores y no garantiza resolverlos. Revisá `npm audit` antes de actualizar la herramienta. La comprobación visual en navegador depende de disponer de un navegador conectado al entorno.
+
+## Fotos de perfil e imágenes de productos
+
+Hacé clic en el avatar del encabezado para editar tu perfil y elegir tu foto. En **Nuevo producto** o **Editar producto**, podés cargar una imagen propia del paquete de yerba, café u otro producto, previsualizarla y quitarla. Se admiten JPG, PNG y WebP de hasta 8 MB; se convierten localmente a JPEG de hasta 384 px de lado mayor y 64.000 caracteres (~48 KB). No se sube el archivo original ni sus metadatos. La demo conserva estas imágenes únicamente durante la sesión.
+
+Las miniaturas se guardan en `users.photo` y `products.image`, protegidas por las mismas reglas de propiedad y suspensión. Consumen la cuota de almacenamiento y transferencia de Firestore y se descargan con los documentos del inventario. Esta solución está pensada para catálogos pequeños. No usa Firebase Storage ni requiere habilitar facturación; [Cloud Storage requiere Blaze](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024).
+
+Para habilitar el guardado de imágenes en un proyecto ya conectado, desplegá las nuevas reglas antes de usarlas:
+
+```powershell
+npx firebase deploy --only firestore:rules --project stockflow-d47aa
+```
+
+Luego reiniciá el servidor local (`npm run dev`). Para publicar estos cambios visuales, volvé a compilar y desplegar Hosting.

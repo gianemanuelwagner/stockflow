@@ -191,3 +191,54 @@ test(
     await assertSucceeds(deleteDoc(doc(alice, "categories", "cat-a")));
   },
 );
+
+test(
+  "fotos limitadas al propietario, con tamaño y formato acotados",
+  { skip: !enabled },
+  async () => {
+    const image = "data:image/jpeg;base64,/9j/AA==";
+    const alice = db("alice");
+    await assertSucceeds(
+      updateDoc(doc(alice, "users", "alice"), { photo: image }),
+    );
+    await assertFails(
+      updateDoc(doc(db("bob"), "users", "alice"), { photo: image }),
+    );
+    await assertFails(
+      updateDoc(doc(alice, "users", "alice"), { photo: image, role: "admin" }),
+    );
+    await assertFails(
+      updateDoc(doc(db("blocked"), "users", "blocked"), { photo: image }),
+    );
+    await assertFails(
+      updateDoc(doc(alice, "users", "alice"), {
+        photo: "https://example.test/track.jpg",
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(alice, "users", "alice"), {
+        photo: "data:image/svg+xml;base64,AAAA",
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(alice, "users", "alice"), {
+        photo: "data:image/jpeg;base64," + "A".repeat(64000),
+      }),
+    );
+    await assertSucceeds(updateDoc(doc(alice, "products", "alice"), { image }));
+    await assertFails(
+      updateDoc(doc(db("bob"), "products", "alice"), { image }),
+    );
+    await assertFails(
+      updateDoc(doc(alice, "products", "alice"), {
+        image: "data:image/jpeg;base64," + "A".repeat(64000),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(alice, "products", "alice"), { image: "" }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(alice, "users", "alice"), { photo: "" }),
+    );
+  },
+);

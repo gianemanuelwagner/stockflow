@@ -35,6 +35,7 @@ import { APP_NAME, money, date, csv, nextStock, errorMessage } from "./config";
 import { auth, db, configured } from "./firebase";
 import { listen, saveProduct, moveStock, saveCategory } from "./data";
 import "./style.css";
+import ImagePicker from "./ImagePicker";
 const seed = [
   {
     id: "1",
@@ -118,6 +119,7 @@ function App() {
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
+    [imageBusy, setImageBusy] = useState(false),
     [loading, setLoading] = useState(false),
     [modal, setModal] = useState(null),
     [menu, setMenu] = useState(false),
@@ -291,7 +293,8 @@ function App() {
       <h1>Privacidad</h1>
       <p>
         Guardamos tu email, nombre, nombre del negocio, fecha de alta, estado de
-        la cuenta y los productos, categorías y movimientos que cargás.
+        la cuenta y los productos, categorías y movimientos que cargás, incluida
+        tu foto de perfil y las imágenes de productos que elijas guardar.
       </p>
       <p>
         Firebase Authentication administra tu contraseña. Nunca se guarda en
@@ -512,7 +515,17 @@ function App() {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.currentTarget));
     const ok = await execute(async () => {
-      if (modal.type === "product") {
+      if (modal.type === "profile") {
+        const values = {
+          name: f.name.trim(),
+          business: f.business.trim(),
+          photo: modal.image ?? profile.photo ?? "",
+        };
+        if (!values.name || !values.business)
+          throw new Error("Completá tu nombre y el negocio.");
+        if (demo) setProfile((p) => ({ ...p, ...values }));
+        else await updateDoc(doc(db, "users", user.uid), values);
+      } else if (modal.type === "product") {
         const values = {
           name: f.name.trim(),
           sku: f.sku.trim(),
@@ -521,6 +534,7 @@ function App() {
           cost: Number(f.cost),
           price: Number(f.price),
           minimum: Number(f.minimum),
+          image: modal.image ?? modal.product?.image ?? "",
         };
         if (!values.name || !values.sku)
           throw new Error("Completá nombre y código.");
@@ -618,7 +632,7 @@ function App() {
     if (ok) setModal(null);
   }
   const table = (
-    <div className="table-wrap">
+    <div className="table-wrap inventory-table">
       <table>
         <thead>
           <tr>
@@ -636,10 +650,14 @@ function App() {
         <tbody>
           {visible.map((p) => (
             <tr key={p.id}>
-              <td>
+              <td data-label="Producto">
                 <div className="product-cell">
                   <span className="product-icon">
-                    <Package size={18} />
+                    {p.image ? (
+                      <img src={p.image} alt={p.name} loading="lazy" />
+                    ) : (
+                      <Package size={18} />
+                    )}
                   </span>
                   <div>
                     <strong>{p.name}</strong>
@@ -647,13 +665,17 @@ function App() {
                   </div>
                 </div>
               </td>
-              <td>{p.category || "Sin categoría"}</td>
-              <td>
+              <td data-label="Categoría">
+                <span className="category-tag">
+                  {p.category || "Sin categoría"}
+                </span>
+              </td>
+              <td data-label="Stock">
                 <strong>{p.quantity}</strong> <span className="muted">un.</span>
               </td>
-              <td>{money(p.cost)}</td>
-              <td>{money(p.price)}</td>
-              <td>
+              <td data-label="Costo">{money(p.cost)}</td>
+              <td data-label="Venta">{money(p.price)}</td>
+              <td data-label="Estado">
                 <span
                   className={
                     "badge " +
@@ -671,7 +693,7 @@ function App() {
                       : "En stock"}
                 </span>
               </td>
-              <td>
+              <td data-label="Acciones">
                 {!readOnly && (
                   <div className="row-actions">
                     <button
@@ -739,7 +761,7 @@ function App() {
                 <strong>{m.productName}</strong>
               </td>
               <td>
-                <span className="badge">{m.type}</span>
+                <span className={"badge movement-" + m.type}>{m.type}</span>
               </td>
               <td>{m.amount}</td>
               <td>
@@ -760,6 +782,13 @@ function App() {
   );
   return (
     <div className="app">
+      {menu && (
+        <button
+          className="nav-scrim"
+          aria-label="Cerrar menú"
+          onClick={() => setMenu(false)}
+        />
+      )}
       <aside className={menu ? "open" : ""}>
         <div className="brand">
           <Package />
@@ -812,6 +841,7 @@ function App() {
           <button
             className="mobile-menu"
             aria-label="Abrir menú"
+            aria-expanded={menu}
             onClick={() => setMenu(!menu)}
           >
             <Menu />
@@ -832,9 +862,18 @@ function App() {
           <div className="header-profile">
             <span className="dot" />
             {demo ? "Demo local" : "Conectado"}
-            <span className="avatar" title={profile.name}>
-              {profile.name[0]}
-            </span>
+            <button
+              className="avatar profile-button"
+              title="Editar mi perfil"
+              aria-label="Editar mi perfil y foto"
+              onClick={() => setModal({ type: "profile" })}
+            >
+              {profile.photo ? (
+                <img src={profile.photo} alt="Tu foto de perfil" />
+              ) : (
+                profile.name[0]
+              )}
+            </button>
           </div>
         </header>
         <main>
@@ -1157,15 +1196,17 @@ function App() {
           >
             <div className="panel-title">
               <h2 id="modal-title">
-                {modal.type === "product"
-                  ? modal.product
-                    ? "Editar producto"
-                    : "Nuevo producto"
-                  : modal.type === "movement"
-                    ? "Registrar movimiento"
-                    : modal.category
-                      ? "Renombrar categoría"
-                      : "Nueva categoría"}
+                {modal.type === "profile"
+                  ? "Mi perfil"
+                  : modal.type === "product"
+                    ? modal.product
+                      ? "Editar producto"
+                      : "Nuevo producto"
+                    : modal.type === "movement"
+                      ? "Registrar movimiento"
+                      : modal.category
+                        ? "Renombrar categoría"
+                        : "Nueva categoría"}
               </h2>
               <button
                 aria-label="Cerrar formulario"
@@ -1180,8 +1221,40 @@ function App() {
               </p>
             )}
             <form onSubmit={submitModal}>
-              {modal.type === "product" ? (
+              {modal.type === "profile" ? (
                 <>
+                  <ImagePicker
+                    avatar
+                    value={modal.image ?? profile.photo ?? ""}
+                    onBusy={setImageBusy}
+                    onChange={(image) =>
+                      setModal((current) => current && { ...current, image })
+                    }
+                  />
+                  <Field
+                    label="Tu nombre"
+                    name="name"
+                    required
+                    maxLength="120"
+                    defaultValue={profile.name}
+                  />
+                  <Field
+                    label="Nombre del negocio"
+                    name="business"
+                    required
+                    maxLength="120"
+                    defaultValue={profile.business}
+                  />
+                </>
+              ) : modal.type === "product" ? (
+                <>
+                  <ImagePicker
+                    value={modal.image ?? modal.product?.image ?? ""}
+                    onBusy={setImageBusy}
+                    onChange={(image) =>
+                      setModal((current) => current && { ...current, image })
+                    }
+                  />
                   <Field
                     autoFocus
                     label="Nombre del producto"
@@ -1321,7 +1394,9 @@ function App() {
                 <button
                   className="primary"
                   disabled={
-                    busy || (modal.type === "movement" && !active.length)
+                    busy ||
+                    imageBusy ||
+                    (modal.type === "movement" && !active.length)
                   }
                 >
                   {busy ? "Guardando…" : "Guardar"}

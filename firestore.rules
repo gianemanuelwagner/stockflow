@@ -8,18 +8,21 @@ service cloud.firestore {
   function own(data) { return active() && data.ownerId == request.auth.uid; }
   function text(v, max) { return v is string && v.size() <= max; }
   function positive(v) { return v is number && v >= 0 && v <= 1000000000; }
+  function image(v) { return v == '' || (text(v,64000) && v.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')); }
   match /users/{uid} {
    allow read: if signed() && (request.auth.uid == uid || admin());
    allow create: if signed() && request.auth.uid == uid
      && request.resource.data.keys().hasAll(['name','business','email','role','status','createdAt'])
-     && request.resource.data.keys().hasOnly(['name','business','email','role','status','createdAt'])
+     && request.resource.data.keys().hasOnly(['name','business','email','role','status','createdAt','photo'])
+     && image(request.resource.data.get('photo',''))
      && request.resource.data.role == 'user' && request.resource.data.status == 'active'
      && request.resource.data.email == request.auth.token.email
      && text(request.resource.data.name,120) && request.resource.data.name.size()>0
      && text(request.resource.data.business,120) && request.resource.data.business.size()>0
      && request.resource.data.createdAt == request.time;
    allow update: if (active() && request.auth.uid == uid
-      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','business'])
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','business','photo'])
+      && image(request.resource.data.get('photo',''))
       && text(request.resource.data.name,120) && request.resource.data.name.size()>0
       && text(request.resource.data.business,120) && request.resource.data.business.size()>0)
      || (admin() && request.auth.uid != uid
@@ -31,7 +34,8 @@ service cloud.firestore {
    function valid() {
     let d = request.resource.data;
     return d.keys().hasAll(['ownerId','name','sku','category','description','cost','price','quantity','minimum','archived','createdAt'])
-     && d.keys().hasOnly(['ownerId','name','sku','category','description','cost','price','quantity','minimum','archived','createdAt'])
+     && d.keys().hasOnly(['ownerId','name','sku','category','description','cost','price','quantity','minimum','archived','createdAt','image'])
+     && image(d.get('image',''))
      && text(d.name,160) && d.name.size()>0 && text(d.sku,80) && d.sku.size()>0
      && text(d.category,100) && text(d.description,1000)
      && positive(d.cost) && positive(d.price) && positive(d.quantity) && positive(d.minimum)
