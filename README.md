@@ -1,5 +1,10 @@
 # StockFlow
 
+## Documentación técnica
+
+Consultá la [documentación profesional de StockFlow](docs/README.md): arquitectura y flujos Mermaid, modelo de Firestore, manual de usuario, seguridad y proceso de documentación asistida por IA. Basada en el código del commit `130533d`, con fuentes y límites de validación explícitos.
+
+
 Aplicación gratuita y de código abierto para el inventario de pequeños negocios. Interfaz en español rioplatense, adaptable a celular y computadora. El nombre del producto se cambia en `src/config.js` (`APP_NAME`).
 
 ## Primera versión
@@ -136,3 +141,4 @@ npx firebase deploy --only firestore:rules --project stockflow-d47aa
 ```
 
 Luego reiniciá el servidor local (`npm run dev`). Para publicar estos cambios visuales, volvé a compilar y desplegar Hosting.
+
